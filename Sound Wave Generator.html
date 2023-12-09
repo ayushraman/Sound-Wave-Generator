@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Sound Wave Generator</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Segoe+UI:wght@400;700&display=swap">
+  <style>
+    body {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      margin: 0;
+      background-color: #1a1a1a;
+      color: #fff;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+
+    h1 {
+      margin-bottom: 20px;
+    }
+
+    label {
+      margin-top: 10px;
+      display: block;
+    }
+
+    input[type="range"],
+    select {
+      margin-bottom: 15px;
+      width: 80%; /* Adjust the width for better touch interactions */
+    }
+
+    button {
+      padding: 10px 20px;
+      font-size: 16px;
+      border: none;
+      border-radius: 10px;
+      margin-right: 10px;
+      cursor: pointer;
+      background-color: #4CAF50;
+      color: #fff;
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+      transition: background-color 0.3s, box-shadow 0.3s;
+    }
+
+    button:hover {
+      background-color: #45a049;
+      box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
+      color: #fff;
+      text-decoration: none;
+    }
+
+    canvas {
+      margin-top: 20px;
+      border: 2px solid #45a049;
+      border-radius: 10px;
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+      width: 80%; /* Adjust the width for better touch interactions */
+    }
+  </style>
+</head>
+<body>
+  <h1>Sound Wave Generator</h1>
+  <label for="frequency">Frequency:</label>
+  <input type="range" id="frequency" min="20" max="2000" value="440">
+  
+  <label for="waveform">Waveform:</label>
+  <select id="waveform">
+    <option value="sine">Sine</option>
+    <option value="square">Square</option>
+    <option value="sawtooth">Sawtooth</option>
+    <option value="triangle">Triangle</option>
+  </select>
+  
+  <label for="volume">Volume:</label>
+  <input type="range" id="volume" min="0" max="1" step="0.01" value="0.5">
+
+  <button onclick="startSynth()">Play</button>
+  <button onclick="stopSynth()">Stop</button>
+
+  <canvas id="waveformCanvas" width="500" height="500"></canvas>
+
+  <script>
+    let audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    let oscillator;
+    let canvas = document.getElementById('waveformCanvas');
+    let canvasContext = canvas.getContext('2d');
+
+    function startSynth() {
+      if (oscillator) {
+        stopSynth();
+      }
+
+      const frequency = parseFloat(document.getElementById('frequency').value);
+      const waveform = document.getElementById('waveform').value;
+      const volume = parseFloat(document.getElementById('volume').value);
+
+      oscillator = audioContext.createOscillator();
+      oscillator.type = waveform;
+      oscillator.frequency.setValueAtTime(frequency, audioContext.currentTime);
+      oscillator.connect(audioContext.destination);
+
+      const gainNode = audioContext.createGain();
+      gainNode.gain.setValueAtTime(volume, audioContext.currentTime);
+      oscillator.connect(gainNode).connect(audioContext.destination);
+
+      oscillator.start();
+
+      drawWaveform();
+    }
+
+    function stopSynth() {
+      if (oscillator) {
+        oscillator.stop();
+        oscillator.disconnect();
+        oscillator = null;
+        canvasContext.clearRect(0, 0, canvas.width, canvas.height);
+      }
+    }
+
+    function drawWaveform() {
+      const bufferLength = 1024;
+      const dataArray = new Float32Array(bufferLength);
+
+      const analyser = audioContext.createAnalyser();
+      analyser.fftSize = 2048;
+      const bufferLengthAlt = analyser.frequencyBinCount;
+      const dataArrayAlt = new Uint8Array(bufferLengthAlt);
+
+      oscillator.connect(analyser);
+
+      const draw = () => {
+        analyser.getFloatTimeDomainData(dataArray);
+        analyser.getByteTimeDomainData(dataArrayAlt);
+
+        canvasContext.clearRect(0, 0, canvas.width, canvas.height);
+        canvasContext.lineWidth = 2;
+        canvasContext.strokeStyle = '#45a049';
+        canvasContext.beginPath();
+
+        const sliceWidth = (canvas.width * 1.0) / bufferLength;
+        let x = 0;
+
+        for (let i = 0; i < bufferLength; i++) {
+          const v = dataArray[i] * 200;
+          const y = (v / 2) + (canvas.height / 2);
+
+          if (i === 0) {
+            canvasContext.moveTo(x, y);
+          } else {
+            canvasContext.lineTo(x, y);
+          }
+
+          x += sliceWidth;
+        }
+
+        canvasContext.lineTo(canvas.width, canvas.height / 2);
+        canvasContext.stroke();
+      };
+
+      setInterval(draw, 1000 / 60);
+    }
+  </script>
+</body>
+</html>
